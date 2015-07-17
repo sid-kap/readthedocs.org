@@ -24,4 +24,5 @@ urlpatterns = patterns(
     url(r'search/$', 'restapi.views.search_views.search', name='api_search'),
     url(r'search/project/$', 'restapi.views.search_views.project_search', name='api_project_search'),
     url(r'search/section/$', 'restapi.views.search_views.section_search', name='api_section_search'),
+    url(r'jobs/status/(?P<task_id>[^/]+)/', 'restapi.views.task_views.job_status', name='api_job_status'),
 )
