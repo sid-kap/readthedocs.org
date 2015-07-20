@@ -7,7 +7,8 @@ var gulp = require('gulp'),
 /* Applications with static sources */
 var sources = {
     'readthedocs/core': [
-        'readthedocs/core/static-src/**/readthedocs-doc-embed.js'
+        'readthedocs/core/static-src/**/readthedocs-doc-embed.js',
+        'readthedocs/core/static-src/**/projectimport.js',
     ],
     'readthedocs/projects': [
         'readthedocs/projects/static-src/**/tools.js'
