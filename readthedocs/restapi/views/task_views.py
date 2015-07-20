@@ -5,8 +5,8 @@ from rest_framework import decorators, permissions
 from rest_framework.renderers import JSONPRenderer, JSONRenderer, BrowsableAPIRenderer
 from rest_framework.response import Response
 
-from rtd.utils.tasks import TaskNoPermission
-from rtd.utils.tasks import get_public_task_data
+from core.utils.tasks import TaskNoPermission
+from core.utils.tasks import get_public_task_data
 import oauth.tasks
 
 
