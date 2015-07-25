@@ -4,10 +4,11 @@ import subprocess
 from django.test import TestCase
 import mock
 
-from readthedocs.projects.tasks import build_docs
+from readthedocs.doc_builder.environments import LocalEnvironment
+from readthedocs.doc_builder.loader import get_builder_class
+from readthedocs.projects.tasks import UpdateDocsTask
 from readthedocs.rtd_tests.factories.projects_factories import ProjectFactory
 from readthedocs.rtd_tests.mocks.paths import fake_paths_lookup
-from readthedocs.doc_builder.loader import get_builder_class
 
 
 class MockProcess(object):
@@ -58,13 +59,16 @@ class BuildTests(TestCase):
             project.conf_py_file)
 
         # Mock open to simulate existing conf.py file
+        build_env = LocalEnvironment(project=project, version=version)
+        task = UpdateDocsTask()
+        task.build_env = build_env
+        task.version = version
+        task.project = project
         with mock.patch('codecs.open', mock.mock_open(), create=True):
             with fake_paths_lookup({conf_path: True}):
-                built_docs = build_docs(version,
-                                        False,
-                                        False,
-                                        False,
-                                        )
+                built_docs = task.build_docs(version,
+                                             False,
+                                             False)
 
         builder_class = get_builder_class(project.documentation_type)
         builder = builder_class(version)
@@ -122,13 +126,16 @@ class BuildTests(TestCase):
         conf_path = os.path.join(project.checkout_path(version.slug), project.conf_py_file)
 
         # Mock open to simulate existing conf.py file
+        build_env = LocalEnvironment(project=project, version=version)
+        task = UpdateDocsTask()
+        task.build_env = build_env
+        task.version = version
+        task.project = project
         with mock.patch('codecs.open', mock.mock_open(), create=True):
             with fake_paths_lookup({conf_path: True}):
-                built_docs = build_docs(version,
-                                        False,
-                                        False,
-                                        False,
-                                        )
+                built_docs = task.build_docs(version,
+                                             False,
+                                             False)
 
         # The HTML and the PDF format were built.
         self.assertEqual(HtmlBuilder_build.call_count, 1)
@@ -166,13 +173,16 @@ class BuildTests(TestCase):
         conf_path = os.path.join(project.checkout_path(version.slug), project.conf_py_file)
 
         # Mock open to simulate existing conf.py file
+        build_env = LocalEnvironment(project=project, version=version)
+        task = UpdateDocsTask()
+        task.build_env = build_env
+        task.version = version
+        task.project = project
         with mock.patch('codecs.open', mock.mock_open(), create=True):
             with fake_paths_lookup({conf_path: True}):
-                built_docs = build_docs(version,
-                                        False,
-                                        False,
-                                        False,
-                                        )
+                built_docs = task.build_docs(version,
+                                             False,
+                                             False)
 
         # The HTML and the Epub format were built.
         self.assertEqual(HtmlBuilder_build.call_count, 1)
