@@ -42,7 +42,7 @@ GROK_API_HOST = 'https://api.grokthedocs.com'
 # For 1.4
 STATIC_ROOT = os.path.join(SITE_ROOT, 'media/static/')
 STATIC_URL = '/static/'
-#STATICFILES_DIRS = ()
+STATICFILES_DIRS = [os.path.join(SITE_ROOT, 'readthedocs', 'static')]
 #STATICFILES_FINDERS = ()
 
 CACHES = {
@@ -174,9 +174,7 @@ INSTALLED_APPS = [
 
     # third party apps
     'pagination',
-    'profiles',
     'taggit',
-    'south',
     'djangosecure',
     'guardian',
     'django_gravatar',
@@ -216,10 +214,6 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.bitbucket',
     #'allauth.socialaccount.providers.twitter',
 ]
-
-SOUTH_MIGRATION_MODULES = {
-    'taggit': 'taggit.south_migrations',
-}
 
 REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAdminUser',),
@@ -261,16 +255,11 @@ ES_DEFAULT_NUM_SHARDS = 5
 
 ALLOWED_HOSTS = ['*']
 
-AUTH_PROFILE_MODULE = "core.UserProfile"
-SOUTH_TESTS_MIGRATE = False
-
 ABSOLUTE_URL_OVERRIDES = {
     'auth.user': lambda o: "/profiles/%s/" % o.username
 }
 
 INTERNAL_IPS = ('127.0.0.1',)
-
-IMPORT_EXTERNAL_DATA = True
 
 backup_count = 1000
 maxBytes = 500 * 100 * 100

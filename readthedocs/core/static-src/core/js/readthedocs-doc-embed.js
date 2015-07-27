@@ -59,12 +59,12 @@ $(document).ready(function () {
 
             // Show promo selectively
             if (data.promo && build.show_promo()) {
-                var promo = sponsorship.Promo.from_variants([
-                  id=data.promo_data.id,
-                  text=data.promo_data.text,
-                  image=data.promo_data.image,
-                  link=data.promo_data.link
-                ])
+                var promo = new sponsorship.Promo(
+                  data.promo_data.id,
+                  data.promo_data.text,
+                  data.promo_data.link,
+                  data.promo_data.image
+                )
                 if (promo) {
                     promo.display();
                 }
