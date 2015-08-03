@@ -4,12 +4,13 @@ import mock
 
 # Mock tastypi API.
 
+
 class ProjectData(object):
     def get(self):
         return dict()
 
 
-def mockVersion(repo):
+def mock_version(repo):
     class MockVersion(object):
         def __init__(self, x=None):
             pass
@@ -65,13 +66,13 @@ def mockVersion(repo):
             if 'slug' in kwargs:
                 return {'objects': [version], 'project': project}
             else:
-              return version
+                return version
     return MockVersion
 
 
 class MockApi(object):
     def __init__(self, repo):
-        self.version = mockVersion(repo)
+        self.version = mock_version(repo)
 
     def project(self, x):
         return ProjectData()
@@ -81,8 +82,8 @@ class MockApi(object):
 def mock_api(repo):
     api_mock = MockApi(repo)
     with (
-            mock.patch('restapi.client.api', api_mock) and
-            mock.patch('api.client.api', api_mock) and
-            mock.patch('projects.tasks.api_v2', api_mock) and
-            mock.patch('projects.tasks.api_v1', api_mock)):
+            mock.patch('readthedocs.restapi.client.api', api_mock) and
+            mock.patch('readthedocs.api.client.api', api_mock) and
+            mock.patch('readthedocs.projects.tasks.api_v2', api_mock) and
+            mock.patch('readthedocs.projects.tasks.api_v1', api_mock)):
         yield api_mock

@@ -3,10 +3,10 @@ from django.test import TestCase
 from django.contrib.auth.models import User
 from allauth.socialaccount.models import SocialToken
 
-from projects.models import Project
+from readthedocs.projects.models import Project
 
-from oauth.utils import import_github
-from oauth.models import GithubOrganization, GithubProject
+from readthedocs.oauth.utils import import_github
+from readthedocs.oauth.models import GithubOrganization, GithubProject
 
 
 class RedirectOauth(TestCase):

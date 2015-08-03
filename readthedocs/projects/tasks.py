@@ -16,30 +16,30 @@ from django.core.urlresolvers import reverse
 from django.utils.translation import ugettext_lazy as _
 from slumber.exceptions import HttpClientError
 
-from builds.constants import LATEST
-from builds.models import Build, Version
-from core.utils import send_email, run_on_app_servers
-from doc_builder.loader import get_builder_class
-from doc_builder.base import restoring_chdir
-from doc_builder.environments import DockerEnvironment
-from projects.exceptions import ProjectImportError
-from projects.models import ImportedFile, Project
-from projects.utils import run, make_api_version, make_api_project
-from projects.constants import LOG_TEMPLATE
-from builds.constants import STABLE
-from projects import symlinks
-from privacy.loader import Syncer
-from search.parse_json import process_all_json_files
-from search.utils import process_mkdocs_json
-from restapi.utils import index_search_request
-from vcs_support import utils as vcs_support_utils
-from api.client import api as api_v1
-from restapi.client import api as api_v2
+from readthedocs.builds.constants import LATEST
+from readthedocs.builds.models import Build, Version
+from readthedocs.core.utils import send_email, run_on_app_servers
+from readthedocs.doc_builder.loader import get_builder_class
+from readthedocs.doc_builder.base import restoring_chdir
+from readthedocs.doc_builder.environments import DockerEnvironment
+from readthedocs.projects.exceptions import ProjectImportError
+from readthedocs.projects.models import ImportedFile, Project
+from readthedocs.projects.utils import run, make_api_version, make_api_project
+from readthedocs.projects.constants import LOG_TEMPLATE
+from readthedocs.builds.constants import STABLE
+from readthedocs.projects import symlinks
+from readthedocs.privacy.loader import Syncer
+from readthedocs.search.parse_json import process_all_json_files
+from readthedocs.search.utils import process_mkdocs_json
+from readthedocs.restapi.utils import index_search_request
+from readthedocs.vcs_support import utils as vcs_support_utils
+from readthedocs.api.client import api as api_v1
+from readthedocs.restapi.client import api as api_v2
 
 try:
     from readthedocs.projects.signals import before_vcs, after_vcs, before_build, after_build
 except:
-    from projects.signals import before_vcs, after_vcs, before_build, after_build
+    from readthedocs.projects.signals import before_vcs, after_vcs, before_build, after_build
 
 
 log = logging.getLogger(__name__)
@@ -160,18 +160,9 @@ def update_documentation_type(version):
     Automatically determine the doc type for a user.
     """
 
-    checkout_path = version.project.checkout_path(version.slug)
-    os.chdir(checkout_path)
-    files = run('find .')[1].split('\n')
-    markdown = sphinx = 0
-    for filename in files:
-        if fnmatch.fnmatch(filename, '*.md') or fnmatch.fnmatch(filename, '*.markdown'):
-            markdown += 1
-        elif fnmatch.fnmatch(filename, '*.rst'):
-            sphinx += 1
+    # Keep this here for any 'auto' projects.
+
     ret = 'sphinx'
-    if markdown > sphinx:
-        ret = 'mkdocs'
     project_data = api_v2.project(version.project.pk).get()
     project_data['documentation_type'] = ret
     api_v2.project(version.project.pk).put(project_data)
@@ -330,7 +321,7 @@ def setup_environment(version):
         'readthedocs-sphinx-ext==0.5.4',
         'sphinx-rtd-theme==0.1.8',
         'alabaster>=0.7,<0.8,!=0.7.5',
-        'recommonmark==0.1.1',
+        'recommonmark==0.2.0',
     ])
 
     wheeldir = os.path.join(settings.SITE_ROOT, 'deploy', 'wheels')
@@ -621,6 +612,11 @@ def finish_build(version_pk, build_pk, hostname=None, html=False,
         version.built = True
         version.save()
 
+    if not pdf:
+        clear_pdf_artifacts(version)
+    if not epub:
+        clear_epub_artifacts(version)
+
     move_files(
         version_pk=version_pk,
         hostname=hostname,
@@ -661,10 +657,12 @@ def move_files(version_pk, hostname, html=False, localmedia=False, search=False,
             from_path = version.project.artifact_path(version=version.slug, type='sphinx_localmedia')
             to_path = version.project.get_production_media_path(type='htmlzip', version_slug=version.slug, include_file=False)
             Syncer.copy(from_path, to_path, host=hostname)
+
         if search:
             from_path = version.project.artifact_path(version=version.slug, type='sphinx_search')
             to_path = version.project.get_production_media_path(type='json', version_slug=version.slug, include_file=False)
             Syncer.copy(from_path, to_path, host=hostname)
+
         # Always move PDF's because the return code lies.
         if pdf:
             from_path = version.project.artifact_path(version=version.slug, type='sphinx_pdf')
@@ -788,6 +786,8 @@ def email_notification(version, build, email):
 
 
 def webhook_notification(version, build, hook_url):
+    project = version.project
+
     data = json.dumps({
         'name': project.name,
         'slug': project.slug,
@@ -882,7 +882,23 @@ def remove_dir(path):
 def clear_artifacts(version_pk):
     """ Remove artifacts from the web servers. """
     version = Version.objects.get(pk=version_pk)
+    clear_pdf_artifacts(version)
+    clear_epub_artifacts(version)
+    clear_htmlzip_artifacts(version)
+    clear_html_artifacts(version)
+
+
+def clear_pdf_artifacts(version):
     run_on_app_servers('rm -rf %s' % version.project.get_production_media_path(type='pdf', version_slug=version.slug))
+
+
+def clear_epub_artifacts(version):
     run_on_app_servers('rm -rf %s' % version.project.get_production_media_path(type='epub', version_slug=version.slug))
+
+
+def clear_htmlzip_artifacts(version):
     run_on_app_servers('rm -rf %s' % version.project.get_production_media_path(type='htmlzip', version_slug=version.slug))
+
+
+def clear_html_artifacts(version):
     run_on_app_servers('rm -rf %s' % version.project.rtd_build_path(version=version.slug))

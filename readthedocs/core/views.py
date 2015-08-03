@@ -16,20 +16,20 @@ from django.views.generic import TemplateView
 
 from haystack.query import EmptySearchQuerySet
 from haystack.query import SearchQuerySet
-from celery.task.control import inspect
+from celery.task.control import inspect  # noqa: pylint false positive
 import stripe
 
-from builds.models import Build
-from builds.models import Version
-from core.forms import FacetedSearchForm
-from core.utils import trigger_build
-from donate.mixins import DonateProgressMixin
-from builds.constants import LATEST
-from projects import constants
-from projects.models import Project, ImportedFile, ProjectRelationship
-from projects.tasks import remove_dir, update_imported_docs
-from redirects.models import Redirect
-from redirects.utils import redirect_filename
+from readthedocs.builds.models import Build
+from readthedocs.builds.models import Version
+from readthedocs.core.forms import FacetedSearchForm
+from readthedocs.core.utils import trigger_build
+from readthedocs.donate.mixins import DonateProgressMixin
+from readthedocs.builds.constants import LATEST
+from readthedocs.projects import constants
+from readthedocs.projects.models import Project, ImportedFile, ProjectRelationship
+from readthedocs.projects.tasks import remove_dir, update_imported_docs
+from readthedocs.redirects.models import Redirect
+from readthedocs.redirects.utils import redirect_filename
 
 import json
 import mimetypes
@@ -56,9 +56,10 @@ class HomepageView(DonateProgressMixin, TemplateView):
         latest = []
         latest_builds = Build.objects.order_by('-date')[:100]
         for build in latest_builds:
-            if (build.project.privacy_level == constants.PUBLIC
-                    and build.project not in latest
-                    and len(latest) < 10):
+            if (
+                    build.project.privacy_level == constants.PUBLIC and
+                    build.project not in latest and
+                    len(latest) < 10):
                 latest.append(build.project)
         context['project_list'] = latest
         context['featured_list'] = Project.objects.filter(featured=True)
@@ -67,9 +68,12 @@ class HomepageView(DonateProgressMixin, TemplateView):
 
 def random_page(request, project_slug=None):
     imported_file = ImportedFile.objects.order_by('?')
-    if project:
+    if project_slug:
         imported_file = imported_file.filter(project__slug=project_slug)
-    url = imported_file.first().get_absolute_url()
+    imported_file = imported_file.first()
+    if imported_file is None:
+        raise Http404
+    url = imported_file.get_absolute_url()
     return HttpResponseRedirect(url)
 
 
@@ -111,7 +115,7 @@ def queue_info(request):
 
 def live_builds(request):
     builds = Build.objects.filter(state='building')[:5]
-    WEBSOCKET_HOST = getattr(settings, 'WEBSOCKET_HOST', 'localhost:8088')
+    websocket_host = getattr(settings, 'WEBSOCKET_HOST', 'localhost:8088')
     count = builds.count()
     percent = 100
     if count > 1:
@@ -119,7 +123,7 @@ def live_builds(request):
     return render_to_response('all_builds.html',
                               {'builds': builds,
                                'build_percent': percent,
-                               'WEBSOCKET_HOST': WEBSOCKET_HOST},
+                               'websocket_host': websocket_host},
                               context_instance=RequestContext(request))
 
 
@@ -134,7 +138,8 @@ def wipe_version(request, project_slug, version_slug):
         del_dirs = [version.project.checkout_path(
             version.slug), version.project.venv_path(version.slug)]
         for del_dir in del_dirs:
-            # Support hacky "broadcast" with MULTIPLE_BUILD_SERVERS setting, otherwise put in normal celery queue
+            # Support hacky "broadcast" with MULTIPLE_BUILD_SERVERS setting,
+            # otherwise put in normal celery queue
             for server in getattr(settings, "MULTIPLE_BUILD_SERVERS", ['celery']):
                 log.info('Removing files on %s' % server)
                 remove_dir.apply_async(
@@ -196,7 +201,9 @@ def _build_branches(project, branch_list):
 
 def _build_url(url, branches):
     try:
-        projects = Project.objects.filter(repo__endswith=url) | Project.objects.filter(repo__endswith=url + '.git')
+        projects = (
+            Project.objects.filter(repo__endswith=url) |
+            Project.objects.filter(repo__endswith=url + '.git'))
         if not projects.count():
             raise NoProjectException()
         for project in projects:
@@ -424,7 +431,8 @@ def serve_docs(request, lang_slug, version_slug, filename, project_slug=None):
         project_slug = request.slug
     try:
         proj = Project.objects.protected(request.user).get(slug=project_slug)
-        ver = Version.objects.public(request.user).get(project__slug=project_slug, slug=version_slug)
+        ver = Version.objects.public(request.user).get(
+            project__slug=project_slug, slug=version_slug)
     except (Project.DoesNotExist, Version.DoesNotExist):
         proj = None
         ver = None
@@ -455,16 +463,17 @@ def _serve_docs(request, project, version, filename, lang_slug=None,
     # This is required because we're forming the filenames outselves instead of
     # letting the web server do it.
     elif (
-        (project.documentation_type == 'sphinx_htmldir' or project.documentation_type == 'mkdocs')
-            and "_static" not in filename
-            and ".css" not in filename
-            and ".js" not in filename
-            and ".png" not in filename
-            and ".jpg" not in filename
-            and "_images" not in filename
-            and ".html" not in filename
-            and "font" not in filename
-            and not "inv" in filename):
+            (project.documentation_type == 'sphinx_htmldir' or
+             project.documentation_type == 'mkdocs') and
+            "_static" not in filename and
+            ".css" not in filename and
+            ".js" not in filename and
+            ".png" not in filename and
+            ".jpg" not in filename and
+            "_images" not in filename and
+            ".html" not in filename and
+            "font" not in filename and
+            "inv" not in filename):
         filename += "index.html"
     else:
         filename = filename.rstrip('/')
@@ -538,36 +547,38 @@ def _try_redirect(request, full_path=None):
             return None
 
     if project:
-        for redirect in project.redirects.all():
-            if redirect.redirect_type == 'prefix':
-                if full_path.startswith(redirect.from_url):
-                    log.debug('Redirecting %s' % redirect)
-                    cut_path = re.sub('^%s' % redirect.from_url, '', full_path)
+        for project_redirect in project.redirects.all():
+            if project_redirect.redirect_type == 'prefix':
+                if full_path.startswith(project_redirect.from_url):
+                    log.debug('Redirecting %s' % project_redirect)
+                    cut_path = re.sub('^%s' % project_redirect.from_url, '', full_path)
                     to = redirect_filename(project=project, filename=cut_path)
                     return HttpResponseRedirect(to)
-            elif redirect.redirect_type == 'page':
-                if full_path == redirect.from_url:
-                    log.debug('Redirecting %s' % redirect)
-                    to = redirect_filename(project=project, filename=redirect.to_url.lstrip('/'))
+            elif project_redirect.redirect_type == 'page':
+                if full_path == project_redirect.from_url:
+                    log.debug('Redirecting %s' % project_redirect)
+                    to = redirect_filename(
+                        project=project,
+                        filename=project_redirect.to_url.lstrip('/'))
                     return HttpResponseRedirect(to)
-            elif redirect.redirect_type == 'exact':
-                if full_path == redirect.from_url:
-                    log.debug('Redirecting %s' % redirect)
-                    return HttpResponseRedirect(redirect.to_url)
+            elif project_redirect.redirect_type == 'exact':
+                if full_path == project_redirect.from_url:
+                    log.debug('Redirecting %s' % project_redirect)
+                    return HttpResponseRedirect(project_redirect.to_url)
                 # Handle full sub-level redirects
-                if '$rest' in redirect.from_url:
-                    match = redirect.from_url.split('$rest')[0]
+                if '$rest' in project_redirect.from_url:
+                    match = project_redirect.from_url.split('$rest')[0]
                     if full_path.startswith(match):
-                        cut_path = re.sub('^%s' % match, redirect.to_url, full_path)
+                        cut_path = re.sub('^%s' % match, project_redirect.to_url, full_path)
                         return HttpResponseRedirect(cut_path)
-            elif redirect.redirect_type == 'sphinx_html':
+            elif project_redirect.redirect_type == 'sphinx_html':
                 if full_path.endswith('/'):
-                    log.debug('Redirecting %s' % redirect)
+                    log.debug('Redirecting %s' % project_redirect)
                     to = re.sub('/$', '.html', full_path)
                     return HttpResponseRedirect(to)
-            elif redirect.redirect_type == 'sphinx_htmldir':
+            elif project_redirect.redirect_type == 'sphinx_htmldir':
                 if full_path.endswith('.html'):
-                    log.debug('Redirecting %s' % redirect)
+                    log.debug('Redirecting %s' % project_redirect)
                     to = re.sub('.html$', '/', full_path)
                     return HttpResponseRedirect(to)
     return None
@@ -586,7 +597,9 @@ def server_error_404(request, template_name='404.html'):
     return r
 
 
-def server_helpful_404(request, project_slug=None, lang_slug=None, version_slug=None, filename=None, template_name='404.html'):
+def server_helpful_404(
+        request, project_slug=None, lang_slug=None, version_slug=None,
+        filename=None, template_name='404.html'):
     response = _try_redirect(request, full_path=filename)
     if response:
         return response
@@ -648,8 +661,10 @@ def get_suggestion(project_slug, lang_slug, version_slug, pagename, user):
                 else:
                     # Case #7: Show available translations of the version
                     suggestion['type'] = 'list'
-                    suggestion[
-                        'message'] = "Requested page seems not to be translated in requested language. But it's available in these languages."
+                    suggestion['message'] = (
+                        "Requested page seems not to be translated in "
+                        "requested language. But it's available in these "
+                        "languages.")
                     suggestion['list'] = []
                     suggestion['list'].append({
                         'label': proj.language,
@@ -678,8 +693,9 @@ def get_suggestion(project_slug, lang_slug, version_slug, pagename, user):
                 if trans:  # requested language is available
                     # Case #6: Show available versions of the translation
                     suggestion['type'] = 'list'
-                    suggestion[
-                        'message'] = "Requested version seems not to have been built yet. But these versions are available."
+                    suggestion['message'] = (
+                        "Requested version seems not to have been built yet. "
+                        "But these versions are available.")
                     suggestion['list'] = []
                     for v in Version.objects.public(user, trans, True):
                         suggestion['list'].append({

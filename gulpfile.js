@@ -127,7 +127,7 @@ gulp.task('build', function (done) {
         }))
         .pipe(es.wait(function (err, body) {
             gulp_util.log('Collecting static files');
-            run('readthedocs/manage.py collectstatic --noinput')
+            run('./manage.py collectstatic --noinput')
                 .exec('', function (err) { done(err); });
         }));
 });
@@ -141,16 +141,15 @@ gulp.task('dev', function (done) {
 
     es
         .merge(Object.keys(sources).map(function (application) {
-            var files = sources[application].map(function (n) {
-                return path.join(
-                    pkg_config.name, application, 'static-src', '**', n
-                );
-            });
+            var files = [
+                path.join(pkg_config.name, application, 'static-src', '**', '*.js'),
+                path.join(pkg_config.name, application, 'static-src', '**', '*.css')
+            ];
             return watch(files, {verbose: true, name: 'dev'}, function () {
                 build_app_sources(application, false)
                     .pipe(es.wait(function (err, body) {
                         gulp_util.log('Collecting static files');
-                        run('readthedocs/manage.py collectstatic --noinput').exec('');
+                        run('./manage.py collectstatic --noinput').exec('');
                     }));
             });
         }))

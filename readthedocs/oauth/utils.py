@@ -6,14 +6,15 @@ from django.conf import settings
 from requests_oauthlib import OAuth1Session, OAuth2Session
 
 from .models import GithubProject, GithubOrganization, BitbucketProject
-from restapi.client import api
+from readthedocs.restapi.client import api
 
 log = logging.getLogger(__name__)
 
 
 def get_oauth_session(user, provider):
 
-    tokens = SocialToken.objects.filter(account__user__username=user.username, app__provider=provider)
+    tokens = SocialToken.objects.filter(
+        account__user__username=user.username, app__provider=provider)
     if tokens.exists():
         token = tokens[0]
     else:
@@ -46,7 +47,9 @@ def get_token_for_project(project, force_local=False):
             token = api.project(project.pk).token().get()['token']
         else:
             for user in project.users.all():
-                tokens = SocialToken.objects.filter(account__user__username=user.username, app__provider='github')
+                tokens = SocialToken.objects.filter(
+                    account__user__username=user.username,
+                    app__provider='github')
                 if tokens.exists():
                     token = tokens[0].token
     except Exception:
@@ -97,7 +100,10 @@ def import_github(user, sync):
                 org_obj = GithubOrganization.objects.create_from_api(
                     org_resp.json(), user=user)
                 # Add repos
-                org_repos_resp = github_paginate(session, 'https://api.github.com/orgs/%s/repos?per_page=100' % org_json['login'])
+                org_repos_resp = github_paginate(
+                    session,
+                    'https://api.github.com/orgs/%s/repos?per_page=100' % (
+                        org_json['login']))
                 for repo in org_repos_resp:
                     GithubProject.objects.create_from_api(
                         repo, user=user, organization=org_obj)
@@ -149,7 +155,10 @@ def import_bitbucket(user, sync):
     if sync and session:
             # Get user repos
         try:
-            owner_resp = bitbucket_paginate(session, 'https://bitbucket.org/api/2.0/repositories/{owner}'.format(owner=user.username))
+            owner_resp = bitbucket_paginate(
+                session,
+                'https://bitbucket.org/api/2.0/repositories/{owner}'.format(
+                    owner=user.username))
             process_bitbucket_json(user, owner_resp)
         except TypeError, e:
             print e
@@ -157,7 +166,10 @@ def import_bitbucket(user, sync):
         # Get org repos
         resp = session.get('https://bitbucket.org/api/1.0/user/privileges/')
         for team in resp.json()['teams'].keys():
-            org_resp = bitbucket_paginate(session, 'https://bitbucket.org/api/2.0/teams/{team}/repositories'.format(team=team))
+            org_resp = bitbucket_paginate(
+                session,
+                'https://bitbucket.org/api/2.0/teams/{team}/repositories'.format(
+                    team=team))
             process_bitbucket_json(user, org_resp)
 
     return session is not None
